@@ -39,7 +39,7 @@ export default function BrandLockup({ to = '/', size = 42, tagline = true, inver
       <BrandMark size={size} />
       <span className="brand-lockup-text">
         <strong>PROFORMA</strong>
-        {tagline && <small>UNIT OF IDEA 2 IMPACT</small>}
+        {tagline && <small>LET'S BREAK THE STEREOTYPE, LET'S FARMLINE</small>}
       </span>
     </Link>
   )

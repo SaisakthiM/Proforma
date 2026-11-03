@@ -80,7 +80,7 @@ export default function About() {
     <div className="about-page">
       <section className="about-hero">
         <div className="about-hero-copy">
-          <span className="eyebrow">About Proforma · Unit of Idea 2 Impact</span>
+          <span className="eyebrow">About Proforma · Let’s break the stereotype, let’s farmline</span>
           <h1>The farm-supply register, kept honestly.</h1>
           <p>
             Proforma is a verified marketplace for the inputs that decide a season: seed,
@@ -141,8 +141,9 @@ export default function About() {
             question stops being "is it cheap?" and becomes "does it fit my ground?"
           </p>
           <div className="about-pull">
-            <span>“Unit of Idea 2 Impact” is not a slogan about scale. It is a promise that one
-            good input, chosen well, changes a whole season.</span>
+            <span>“Let’s break the stereotype, let’s farmline” is the first line in the register:
+            farming is not a fallback. It is a business of decisions, and every decision deserves
+            a declared lot.</span>
           </div>
         </div>
       </section>

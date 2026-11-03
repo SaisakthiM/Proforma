@@ -63,7 +63,8 @@ resource "docker_image" "api" {
 
   build {
     context    = local.repo_root
-    dockerfile = "projects/backend/Dockerfile"
+    dockerfile = "${local.repo_root}/projects/backend/Dockerfile"
+    builder    = "default"
   }
 
   triggers = {
@@ -77,10 +78,8 @@ resource "docker_image" "gateway" {
 
   build {
     context    = local.repo_root
-    dockerfile = "projects/gateway/Dockerfile"
-    args = {
-      VITE_API_URL = ""
-    }
+    dockerfile = "${local.repo_root}/projects/gateway/Dockerfile"
+    builder    = "default"
   }
 
   triggers = {

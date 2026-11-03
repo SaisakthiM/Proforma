@@ -1,4 +1,4 @@
-# PROFORMA — Unit of Idea 2 Impact
+# PROFORMA — Let's Break the Stereotype, Let's Farmline
 
 A complete, production-shaped agricultural supply marketplace: verified seeds,
 machinery, tools and soils, matched to a farmer's soil, climate and crops.

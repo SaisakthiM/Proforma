@@ -48,7 +48,7 @@ export default function Header() {
     <header className="site-header">
       <div className="utility-bar">
         <div className="utility-inner">
-          <span className="utility-tag">UNIT OF IDEA 2 IMPACT</span>
+          <span className="utility-tag">LET'S BREAK THE STEREOTYPE, LET'S FARMLINE</span>
           <div className="utility-links">
             <span>Ships across India</span>
             <Link to="/about">Our standards</Link>
@@ -146,12 +146,14 @@ export default function Header() {
             </div>
 
             <Link to="/cart" className="cart-trigger">
-              <ShoppingBag size={19} />
-              <span>
+              <span className="cart-icon">
+                <ShoppingBag size={19} />
+                {count > 0 && <b className="cart-count">{count}</b>}
+              </span>
+              <span className="cart-label">
                 <small>Basket</small>
                 <strong>{count > 0 ? `${count} item${count > 1 ? 's' : ''}` : 'Empty'}</strong>
               </span>
-              {count > 0 && <b className="cart-count">{count}</b>}
             </Link>
           </div>
         </div>

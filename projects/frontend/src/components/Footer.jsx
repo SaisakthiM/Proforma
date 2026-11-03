@@ -33,7 +33,7 @@ export default function Footer() {
             <div>
               <span className="eyebrow eyebrow--gold">The mark</span>
               <strong>Grown from a single idea.</strong>
-              <span>Unit of Idea 2 Impact · Est. 2026</span>
+              <span>Let’s break the stereotype, let’s farmline · Est. 2026</span>
             </div>
           </div>
         </div>
@@ -84,7 +84,7 @@ export default function Footer() {
       </div>
 
       <div className="footer-bottom">
-        <span>© 2026 Proforma. Unit of Idea 2 Impact.</span>
+        <span>© 2026 Proforma. Let’s break the stereotype, let’s farmline.</span>
         <span>Payments are simulated in this demo. No bank account is connected.</span>
         <div>
           <Link to="/about">Privacy</Link>

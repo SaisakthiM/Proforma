@@ -50,7 +50,7 @@ public class ProductService {
         int safeSize = Math.min(Math.max(size, 1), 48);
         Pageable pageable = PageRequest.of(safePage, safeSize, sortFor(sort));
         Page<Product> result = productRepository.search(
-                blankToNull(q), category, minPrice, maxPrice, minRating, null, pageable);
+                searchTerm(q), category, minPrice, maxPrice, minRating, null, pageable);
         return PageResponse.from(result.map(ProductMapper::toCard));
     }
 
@@ -133,10 +133,9 @@ public class ProductService {
         };
     }
 
-    private String blankToNull(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return value.trim();
+    // Postgres cannot infer the type of a null String in the concat/like predicate,
+    // so the query uses '' to mean "no term" and the parameter is never null.
+    private String searchTerm(String value) {
+        return value == null ? "" : value.trim();
     }
 }

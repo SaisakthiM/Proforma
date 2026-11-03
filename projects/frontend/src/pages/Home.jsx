@@ -193,7 +193,7 @@ export default function Home() {
               </span>
             </Link>
           )}
-          <span className="hero-side-note">PROFORMA · UNIT OF IDEA 2 IMPACT</span>
+          <span className="hero-side-note">PROFORMA · LET'S BREAK THE STEREOTYPE, LET'S FARMLINE</span>
           <span className="hero-corner hero-corner--tl" />
           <span className="hero-corner hero-corner--br" />
         </div>

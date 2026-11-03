@@ -832,7 +832,7 @@ code {
   color: var(--forest);
 }
 
-.cart-trigger > span {
+.cart-trigger > .cart-label {
   display: flex;
   flex-direction: column;
   line-height: 1.25;
@@ -852,10 +852,16 @@ code {
   color: var(--ink);
 }
 
+.cart-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
 .cart-count {
   position: absolute;
   top: -6px;
-  right: -8px;
+  right: -6px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -1191,6 +1197,14 @@ code {
 
 .page-intro--compact {
   padding-top: 38px;
+}
+
+/* The cart page already applies the container gutter; the shared intro
+   padding was indenting the heading from the cart lines. */
+.cart-page .page-intro {
+  max-width: none;
+  margin: 0;
+  padding: 34px 0 28px;
 }
 
 /* Skeletons */
@@ -3552,6 +3566,15 @@ code {
 .checkout-head {
   padding: 32px 0 26px;
   max-width: 760px;
+}
+
+.checkout-head .back-link {
+  display: flex;
+  width: fit-content;
+}
+
+.checkout-head .eyebrow {
+  display: block;
 }
 
 .checkout-head h1 {
@@ -6933,7 +6956,7 @@ code {
   }
 
   .account-trigger > span,
-  .cart-trigger > span {
+  .cart-trigger > .cart-label {
     display: none;
   }
 
@@ -7442,6 +7465,12 @@ code {
 
   .utility-inner {
     justify-content: center;
+  }
+
+  .utility-tag {
+    font-size: 7.5px;
+    letter-spacing: 0.14em;
+    text-align: center;
   }
 
   .utility-links {

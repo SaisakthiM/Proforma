@@ -27,7 +27,7 @@ public record ProductCard(
         List<String> tags,
         boolean featured,
         boolean active,
-        int viewCount,
+        long viewCount,
         int discountPercent,
         Instant createdAt
 ) {
