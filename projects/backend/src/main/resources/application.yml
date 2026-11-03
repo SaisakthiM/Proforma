@@ -1,0 +1,57 @@
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+
+spring:
+  application:
+    name: proforma-api
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/proforma}
+    username: ${SPRING_DATASOURCE_USERNAME:proforma}
+    password: ${SPRING_DATASOURCE_PASSWORD:proforma}
+    hikari:
+      maximum-pool-size: 12
+      minimum-idle: 2
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 8MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:proforma-local-dev-secret-key-change-me-32chars}
+    ttl-days: ${APP_JWT_TTL_DAYS:7}
+  cors:
+    origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://localhost:8080}
+  uploads:
+    dir: ${APP_UPLOADS_DIR:uploads}
+  seed:
+    enabled: ${APP_SEED_ENABLED:true}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.springframework.security: warn

@@ -1,0 +1,53 @@
+# --- Secrets & local environment -------------------------------------------
+.env
+.env.*
+!.env.example
+environment/**/terraform.tfvars
+environment/**/*.auto.tfvars
+
+# --- Terraform -------------------------------------------------------------
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# --- Java / Maven ----------------------------------------------------------
+**/target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
+
+# --- Node / Vite -----------------------------------------------------------
+**/node_modules/
+**/dist/
+**/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Uploads & runtime -----------------------------------------------------
+projects/backend/uploads/
+**/uploads/*
+!**/uploads/.gitkeep
+*.log
+logs/
+
+# --- Editors & OS ----------------------------------------------------------
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Scratch ---------------------------------------------------------------
+vibe_images/

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.terraform
+**/.terraform
+**/node_modules
+**/dist
+**/target
+**/*.log
+environment/**/.terraform.lock.hcl
+environment/**/terraform.tfstate*
+environment/**/terraform.tfvars

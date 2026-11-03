@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and edit before applying anything beyond a local demo.
+# terraform.tfvars is gitignored.
+
+project_name = "proforma"
+environment  = "prod"
+http_port    = 8080
+image_tag    = "1.0.0"
+
+postgres_db       = "proforma"
+postgres_user     = "proforma"
+postgres_password = "change-this-database-password"
+
+jwt_secret = "change-this-to-a-random-32-plus-character-secret"
+
+seed_database = true
+# Leave empty for same-origin only. The gateway already fronts the API.
+cors_origins = ""
+
+restart_policy = "unless-stopped"
