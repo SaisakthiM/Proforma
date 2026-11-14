@@ -5,8 +5,21 @@ machinery, tools and soils, matched to a farmer's soil, climate and crops.
 
 - **Storefront** — React 18 + Vite, paper/forest/gold registry aesthetic.
 - **API** — Spring Boot 3.3 / Java 21, stateless JWT, JPA + Postgres.
-- **Edge** — nginx gateway serving the built SPA and proxying `/api` and `/media`.
+- **Mobile** — Expo SDK 54 app, demo and production listings.
+- **Edge** — nginx image serving the built SPA and proxying `/api` and `/media`.
 - **Infrastructure** — Terraform (Docker provider) under `environment/prod`.
+
+The application lives in three independent repositories; this repository holds the
+infrastructure and the shared runbook:
+
+| Repository | Contains | Pipeline |
+| --- | --- | --- |
+| `proforma-web` | Vite storefront, nginx deploy image | `.github/workflows/ci.yml` builds; `deploy.yml` ships to Vercel |
+| `proforma-api` | Spring Boot API, Dockerfile | `.github/workflows/ci.yml` runs Maven verify; `deploy.yml` ships to Railway |
+| `proforma-mobile` | Expo app, demo/production variants | `ci.yml` type-checks; `android-release.yml` builds/submits; `ota-update.yml` pushes OTA |
+
+The deploy workflows no-op until their repository secrets exist, so builds stay green
+before the hosting accounts are wired.
 
 Only the gateway publishes a host port. Postgres and the API stay on a private
 Docker network and persist through named volumes.
@@ -16,21 +29,23 @@ Docker network and persist through named volumes.
 ## Repository layout
 
 ```
-.
-├── environment/
-│   └── prod/                  Terraform stack (network, volumes, 3 containers)
-├── projects/
-│   ├── backend/               Spring Boot API, seed data, uploads
-│   ├── frontend/              React storefront + seller studio
-│   └── gateway/               nginx config and branded 404/503 pages
-├── .dockerignore
-├── .gitignore
-└── README.md
+C:\Qoder\
+├── Proforma/                  this repository: infrastructure + runbook
+│   └── environment/
+│       └── prod/              Terraform stack (network, volumes, 3 containers)
+├── proforma-web/              React storefront + seller studio + nginx deploy image
+├── proforma-api/              Spring Boot API, seed data, uploads
+└── proforma-mobile/           Expo app
 ```
+
+`terraform apply` builds the API and storefront from the sibling checkouts. Keep the
+three repositories side by side, or pass `-var "api_source_dir=..."` and
+`-var "web_source_dir=..."`.
 
 ## Deploy the demo
 
-Prerequisites: Docker Engine/Desktop running, Terraform ≥ 1.5.
+Prerequisites: Docker Engine/Desktop running, Terraform ≥ 1.5, and the `proforma-api`
+and `proforma-web` repositories checked out as siblings of this one.
 
 ```bash
 cd environment/prod
@@ -53,12 +68,12 @@ What Terraform creates:
 | Volume | `proforma-prod-pgdata` | Postgres data |
 | Volume | `proforma-prod-uploads` | seller product images (`/media/*`) |
 | Container | `proforma-prod-db` | `postgres:16-alpine`, internal only |
-| Container | `proforma-prod-api` | built from `projects/backend`, internal only |
-| Container | `proforma-prod-gateway` | built from `projects/gateway`, publishes `:8080` |
+| Container | `proforma-prod-api` | built from `proforma-api`, internal only |
+| Container | `proforma-prod-gateway` | built from `proforma-web`, publishes `:8080` |
 
-The images rebuild automatically when frontend/backend/gateway source changes
-(content hashes feed `docker_image.triggers`). The first apply compiles
-Maven and Vite inside Docker, so expect a few minutes.
+The images rebuild automatically when web/API source changes (content hashes feed
+`docker_image.triggers`). The first apply compiles Maven and Vite inside Docker, so
+expect a few minutes.
 
 Useful commands:
 
@@ -182,14 +197,14 @@ The same schema is used locally; only the datasource URL differs.
 
 ```bash
 # API (Java 21 + Maven), with Postgres on localhost:5432
-cd projects/backend
+cd ../proforma-api
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/proforma \
 SPRING_DATASOURCE_USERNAME=proforma \
 SPRING_DATASOURCE_PASSWORD=proforma \
 mvn spring-boot:run
 
 # Storefront, proxying /api and /media to :8080
-cd projects/frontend
+cd ../proforma-web
 npm install
 npm run dev            # http://localhost:5173
 ```
@@ -197,6 +212,93 @@ npm run dev            # http://localhost:5173
 Environment overrides accepted by the API: `SPRING_DATASOURCE_*`,
 `APP_JWT_SECRET`, `APP_JWT_TTL_DAYS`, `APP_CORS_ORIGINS`, `APP_UPLOADS_DIR`,
 `APP_SEED_ENABLED`.
+
+## Deploy to production (Vercel + Railway + Supabase + Cloudflare)
+
+Production is split by hostname:
+
+| Hostname | Serves | Host |
+| --- | --- | --- |
+| `proforma.dpdns.org` | storefront (static Vite build) | Vercel |
+| `api.proforma.dpdns.org` | `/api/**` JSON API | Railway |
+| — | PostgreSQL | Supabase |
+
+Cloudflare is DNS, TLS and WAF in front of those hostnames. The tunnel in
+`environment/local/cloudflared.example.yml` is only for exposing local dev servers; production does
+not use it.
+
+### 1. Supabase (database)
+
+Create a project in the region closest to your users, then copy the **session-mode pooler**
+connection string: `aws-<region>.pooler.supabase.com`, port `5432`, user `postgres.<project-ref>`.
+Do not use transaction mode (`6543`) with Hibernate — it breaks prepared statements.
+
+Hibernate `ddl-auto: update` creates the schema on first boot. Boot once with
+`APP_SEED_ENABLED=true` to load the sample catalogue, then set it to `false`. Move to Flyway plus
+`validate` before storing real customer data.
+
+### 2. Railway (API)
+
+Create a service from the **`proforma-api`** repository. The repository root is the build
+context and Railway detects the `Dockerfile` there. Add the repository secret
+`RAILWAY_TOKEN` and the variable `RAILWAY_SERVICE` (the workflow defaults to `proforma-api`)
+so `.github/workflows/deploy.yml` can deploy on every push to `main`. Set:
+
+| Variable | Value |
+| --- | --- |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<pooler-host>:5432/postgres?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres.<project-ref>` |
+| `SPRING_DATASOURCE_PASSWORD` | Supabase database password |
+| `APP_JWT_SECRET` | 32+ random bytes |
+| `APP_CORS_ORIGINS` | `https://proforma.dpdns.org` |
+| `APP_UPLOADS_DIR` | `/data/uploads` (with a Railway volume mounted at `/data`) |
+| `APP_SEED_ENABLED` | `true` for the first boot, then `false` |
+
+`server.port` now reads `PORT`, which Railway injects. Add the custom domain
+`api.proforma.dpdns.org` in Railway and copy the CNAME target it shows.
+
+### 3. Vercel (storefront)
+
+Import the **`proforma-web`** repository and leave **Root Directory** at the repository root.
+Add `VITE_API_URL=https://api.proforma.dpdns.org`. `vercel.json` supplies the SPA rewrite (so
+`/privacy` works on a hard refresh) and basic security headers. Add the domain
+`proforma.dpdns.org`. For CLI deploys from Actions, add the repository secrets
+`VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`; without them the deploy job skips.
+
+Leave `VITE_PAYMENTS` unset while checkout is simulated; set it to `razorpay` when the live
+checkout ships, and the footer disclosure switches with it.
+
+### 4. Cloudflare DNS
+
+In the `proforma.dpdns.org` zone:
+
+| Type | Name | Target | Proxy |
+| --- | --- | --- | --- |
+| CNAME | `@` | `cname.vercel-dns.com` | Proxied |
+| CNAME | `api` | Railway target | DNS only at first |
+
+Set SSL/TLS mode to **Full (strict)**; "Flexible" causes redirect loops. Keep `api` DNS-only until
+Railway has issued its certificate, then turn the proxy on if you want Cloudflare in front of the
+API as well.
+
+Set up Cloudflare Email Routing so `privacy@proforma.dpdns.org` forwards to a mailbox you read — it
+is the contact in the privacy policy and the Amazon listing.
+
+### 5. Verify
+
+```bash
+curl -s https://api.proforma.dpdns.org/actuator/health
+curl -sI https://proforma.dpdns.org/privacy
+```
+
+Privacy policy URL for the store listing: `https://proforma.dpdns.org/privacy`.
+
+### 6. Before going public
+
+- Rotate `postgres_password` and `jwt_secret` from `environment/prod/terraform.tfvars`; they are
+  committed to the repository.
+- Seller uploads currently land on the container filesystem. Attach a Railway volume now, or move
+  uploads to Supabase Storage before onboarding real sellers.
 
 ## Operations notes
 

@@ -1,3 +1,15 @@
+variable "web_source_dir" {
+  description = "Path to the proforma-web checkout, relative to environment/prod."
+  type        = string
+  default     = "../../../proforma-web"
+}
+
+variable "api_source_dir" {
+  description = "Path to the proforma-api checkout, relative to environment/prod."
+  type        = string
+  default     = "../../../proforma-api"
+}
+
 variable "project_name" {
   description = "Base name used for every container, network and volume."
   type        = string

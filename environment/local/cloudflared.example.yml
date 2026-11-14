@@ -1,0 +1,17 @@
+# Optional local tunnel — only for exposing your dev servers on the real hostnames.
+# Production does not use this file: point DNS at Vercel (web) and Railway (API).
+#
+# Copy to %USERPROFILE%\.cloudflared\config.yml, replace the two placeholders,
+# then run:  cloudflared tunnel run <tunnel-name>
+#
+# `cloudflared tunnel list` prints the tunnel name and UUID.
+tunnel: <tunnel-name-or-uuid>
+credentials-file: C:\Users\<you>\.cloudflared\<tunnel-id>.json
+
+ingress:
+  - hostname: proforma.dpdns.org
+    service: http://localhost:5173
+  - hostname: api.proforma.dpdns.org
+    service: http://localhost:8080
+  # Without a catch-all rule the tunnel returns 503 for every request.
+  - service: http_status:404

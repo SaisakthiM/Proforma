@@ -1,6 +1,7 @@
 locals {
   name_prefix   = "${var.project_name}-${var.environment}"
-  repo_root     = abspath("${path.module}/../..")
+  web_root      = abspath("${path.module}/${var.web_source_dir}")
+  api_root      = abspath("${path.module}/${var.api_source_dir}")
   api_image     = "${local.name_prefix}-api:${var.image_tag}"
   gateway_image = "${local.name_prefix}-gateway:${var.image_tag}"
   cors_origins  = var.cors_origins == "" ? "http://localhost:${var.http_port}" : var.cors_origins
@@ -9,32 +10,33 @@ locals {
   # image instead of leaving a stale container running.
   api_source_hash = sha256(join("", concat(
     [
-      filesha256("${local.repo_root}/projects/backend/pom.xml"),
-      filesha256("${local.repo_root}/projects/backend/Dockerfile"),
+      filesha256("${local.api_root}/pom.xml"),
+      filesha256("${local.api_root}/Dockerfile"),
     ],
     [
-      for f in sort(fileset("${local.repo_root}/projects/backend/src", "**")) :
-      filesha256("${local.repo_root}/projects/backend/src/${f}")
+      for f in sort(fileset("${local.api_root}/src", "**")) :
+      filesha256("${local.api_root}/src/${f}")
     ]
   )))
 
   gateway_source_hash = sha256(join("", concat(
     [
-      filesha256("${local.repo_root}/projects/frontend/package.json"),
-      filesha256("${local.repo_root}/projects/frontend/index.html"),
-      filesha256("${local.repo_root}/projects/frontend/vite.config.js"),
-      filesha256("${local.repo_root}/projects/gateway/nginx.conf"),
-      filesha256("${local.repo_root}/projects/gateway/Dockerfile"),
-      filesha256("${local.repo_root}/projects/gateway/errors/404.html"),
-      filesha256("${local.repo_root}/projects/gateway/errors/503.html"),
+      filesha256("${local.web_root}/package.json"),
+      filesha256("${local.web_root}/package-lock.json"),
+      filesha256("${local.web_root}/index.html"),
+      filesha256("${local.web_root}/vite.config.js"),
+      filesha256("${local.web_root}/Dockerfile"),
+      filesha256("${local.web_root}/deploy/nginx.conf"),
+      filesha256("${local.web_root}/deploy/errors/404.html"),
+      filesha256("${local.web_root}/deploy/errors/503.html"),
     ],
     [
-      for f in sort(fileset("${local.repo_root}/projects/frontend/src", "**")) :
-      filesha256("${local.repo_root}/projects/frontend/src/${f}")
+      for f in sort(fileset("${local.web_root}/src", "**")) :
+      filesha256("${local.web_root}/src/${f}")
     ],
     [
-      for f in sort(fileset("${local.repo_root}/projects/frontend/public", "**")) :
-      filesha256("${local.repo_root}/projects/frontend/public/${f}")
+      for f in sort(fileset("${local.web_root}/public", "**")) :
+      filesha256("${local.web_root}/public/${f}")
     ]
   )))
 }
@@ -62,8 +64,8 @@ resource "docker_image" "api" {
   keep_locally = true
 
   build {
-    context    = local.repo_root
-    dockerfile = "${local.repo_root}/projects/backend/Dockerfile"
+    context    = local.api_root
+    dockerfile = "${local.api_root}/Dockerfile"
     builder    = "default"
   }
 
@@ -77,8 +79,8 @@ resource "docker_image" "gateway" {
   keep_locally = true
 
   build {
-    context    = local.repo_root
-    dockerfile = "${local.repo_root}/projects/gateway/Dockerfile"
+    context    = local.web_root
+    dockerfile = "${local.web_root}/Dockerfile"
     builder    = "default"
   }
 
@@ -88,10 +90,10 @@ resource "docker_image" "gateway" {
 }
 
 resource "docker_container" "db" {
-  name       = "${local.name_prefix}-db"
-  image      = docker_image.postgres.image_id
-  restart    = var.restart_policy
-  wait       = true
+  name         = "${local.name_prefix}-db"
+  image        = docker_image.postgres.image_id
+  restart      = var.restart_policy
+  wait         = true
   wait_timeout = 120
 
   env = [
@@ -122,10 +124,10 @@ resource "docker_container" "db" {
 }
 
 resource "docker_container" "api" {
-  name       = "${local.name_prefix}-api"
-  image      = docker_image.api.image_id
-  restart    = var.restart_policy
-  wait       = true
+  name         = "${local.name_prefix}-api"
+  image        = docker_image.api.image_id
+  restart      = var.restart_policy
+  wait         = true
   wait_timeout = 180
 
   env = [
@@ -162,10 +164,10 @@ resource "docker_container" "api" {
 }
 
 resource "docker_container" "gateway" {
-  name       = "${local.name_prefix}-gateway"
-  image      = docker_image.gateway.image_id
-  restart    = var.restart_policy
-  wait       = true
+  name         = "${local.name_prefix}-gateway"
+  image        = docker_image.gateway.image_id
+  restart      = var.restart_policy
+  wait         = true
   wait_timeout = 60
 
   ports {

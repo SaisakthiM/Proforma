@@ -35,7 +35,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # --- Uploads & runtime -----------------------------------------------------
-projects/backend/uploads/
 **/uploads/*
 !**/uploads/.gitkeep
 *.log
