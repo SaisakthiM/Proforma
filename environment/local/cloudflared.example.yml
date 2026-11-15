@@ -1,5 +1,6 @@
 # Optional local tunnel — only for exposing your dev servers on the real hostnames.
-# Production does not use this file: point DNS at Vercel (web) and Railway (API).
+# The home deployment uses the token tunnel in environment/home; the hosted split points DNS at
+# Vercel (web) and Railway (API) instead.
 #
 # Copy to %USERPROFILE%\.cloudflared\config.yml, replace the two placeholders,
 # then run:  cloudflared tunnel run <tunnel-name>

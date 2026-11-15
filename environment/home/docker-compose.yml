@@ -1,0 +1,120 @@
+name: proforma-home
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-proforma}
+      POSTGRES_USER: ${POSTGRES_USER:-proforma}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env and set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ../../../proforma-api
+    image: proforma-api:home
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-proforma}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-proforma}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      APP_DB_POOL_SIZE: ${DB_POOL_SIZE:-8}
+      APP_JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      APP_CORS_ORIGINS: ${PUBLIC_ORIGIN:-https://proforma.dpdns.org}
+      APP_UPLOADS_DIR: /app/uploads
+      APP_SEED_ENABLED: ${SEED_DATABASE:-true}
+      APP_PRICING_FREE_SHIPPING_THRESHOLD: ${FREE_SHIPPING_THRESHOLD:-999.00}
+      APP_PRICING_SHIPPING_FEE: ${SHIPPING_FEE:-79.00}
+      APP_FEATURES_CHECKOUT_ENABLED: ${CHECKOUT_ENABLED:-true}
+      APP_FEATURES_EVENTS_ENABLED: ${EVENTS_ENABLED:-true}
+      APP_FEATURES_SELLER_SIGNUP_ENABLED: ${SELLER_SIGNUP_ENABLED:-true}
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+    logging: *default-logging
+
+  gateway:
+    build:
+      context: ../../../proforma-web
+      args:
+        # Same-origin calls: the browser uses /api and /media on this host.
+        VITE_API_URL: ""
+        VITE_PAYMENTS: ""
+    image: proforma-web:home
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # Loopback only. Public traffic arrives through the Cloudflare Tunnel.
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    logging: *default-logging
+
+  # One-off backup helpers. Run with: docker compose --profile tools run --rm backup
+  backup:
+    image: postgres:16-alpine
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ./backups:/backup
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        pg_dump -h db -U ${POSTGRES_USER:-proforma} ${POSTGRES_DB:-proforma}
+        | gzip > "/backup/proforma-`date +%Y%m%d-%H%M%S`.sql.gz"
+
+  backup-uploads:
+    image: alpine:3.20
+    profiles: ["tools"]
+    volumes:
+      - uploads:/data
+      - ./backups:/backup
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        tar czf "/backup/uploads-`date +%Y%m%d-%H%M%S`.tar.gz" -C /data .
+
+volumes:
+  pgdata:
+  uploads:

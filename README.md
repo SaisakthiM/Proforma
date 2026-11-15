@@ -1,7 +1,7 @@
 # PROFORMA — Let's Break the Stereotype, Let's Farmline
 
-A complete, production-shaped agricultural supply marketplace: verified seeds,
-machinery, tools and soils, matched to a farmer's soil, climate and crops.
+A complete, production-shaped agricultural supply marketplace: declared seed
+lots, machinery, tools and soils, matched to a farmer's soil, climate and crops.
 
 - **Storefront** — React 18 + Vite, paper/forest/gold registry aesthetic.
 - **API** — Spring Boot 3.3 / Java 21, stateless JWT, JPA + Postgres.
@@ -21,8 +21,9 @@ infrastructure and the shared runbook:
 The deploy workflows no-op until their repository secrets exist, so builds stay green
 before the hosting accounts are wired.
 
-Only the gateway publishes a host port. Postgres and the API stay on a private
-Docker network and persist through named volumes.
+Only the gateway publishes a host port, and the home stack binds it to loopback.
+Postgres and the API stay on a private Docker network and persist through named
+volumes.
 
 ---
 
@@ -32,6 +33,7 @@ Docker network and persist through named volumes.
 C:\Qoder\
 ├── Proforma/                  this repository: infrastructure + runbook
 │   └── environment/
+│       ├── home/              old-PC Docker Compose + Cloudflare Tunnel stack
 │       └── prod/              Terraform stack (network, volumes, 3 containers)
 ├── proforma-web/              React storefront + seller studio + nginx deploy image
 ├── proforma-api/              Spring Boot API, seed data, uploads
@@ -41,6 +43,26 @@ C:\Qoder\
 `terraform apply` builds the API and storefront from the sibling checkouts. Keep the
 three repositories side by side, or pass `-var "api_source_dir=..."` and
 `-var "web_source_dir=..."`.
+
+## Run the pilot at home (old PC + Cloudflare Tunnel)
+
+This is the current deployment: one machine runs Postgres, the API and the
+gateway, and a `cloudflared` container publishes it on `proforma.dpdns.org`.
+Only `127.0.0.1:8080` is bound on the host; public traffic goes through the
+tunnel. Full steps, backups and update/rollback are in
+[`environment/home/README.md`](environment/home/README.md).
+
+```bash
+cd environment/home
+cp .env.example .env        # set tunnel token, DB password, JWT secret
+docker compose up -d --build
+docker compose ps
+```
+
+The stack builds the API and storefront from the sibling checkouts, so keep the
+three repositories side by side. Feature switches (`CHECKOUT_ENABLED`,
+`EVENTS_ENABLED`, `SELLER_SIGNUP_ENABLED`) and pricing (`FREE_SHIPPING_THRESHOLD`,
+`SHIPPING_FEE`) are read from `.env` on boot.
 
 ## Deploy the demo
 
@@ -108,11 +130,12 @@ district, climate, irrigation, farm size) or seller business profile.
 
 ## Payments are simulated
 
-Checkout intentionally mimics a Stripe-style card/UPI/net-banking UI, but **no
-bank account, card network or PSP is connected**. Card, UPI and bank fields are
-validated and formatted in the browser only; they are never sent anywhere.
-The API receives just `paymentMethod` and `paymentLabel`, and returns a fake
-reference such as `PF-4F7K2A9C`. Do not enter real payment credentials.
+Checkout presents demo payment rails (card / UPI / net banking / COD) but **no
+bank account, card network or PSP is connected**, and the UI no longer collects
+card numbers, expiry dates, CVV, UPI IDs or bank credentials. The API receives
+just `paymentMethod` and `paymentLabel`, and returns a fake reference such as
+`PF-4F7K2A9C`. Never wire a real gateway until the payment work in the risk
+register is complete.
 
 ## Seed data
 
@@ -146,8 +169,8 @@ with `seed_database = false` in `terraform.tfvars`.
 - Custom 3-step registration with farmer/seller onboarding.
 - Farm-profile, co-view, category-affinity and quality signals feed
   `/api/recommendations/me` and `/api/recommendations/product/{id}`.
-- Events (`VIEW`, `CART`) are recorded anonymously so recommendations improve
-  from the first visit.
+- Events (`VIEW`, `CART`) are recorded per product; signed-in requests carry the
+  JWT and repeat events within an hour are dropped.
 
 **Seller studio** (`/seller`)
 
@@ -155,8 +178,8 @@ with `seed_database = false` in `terraform.tfvars`.
 - Listings table with search, category/status/stock filters and edit links.
 - Create/edit listing with image upload (≤ 6 MB) or URL, pricing, stock,
   location, tags, draft/paused/featured states.
-- Orders with dispatch status updates (`PAID → PACKED → SHIPPED → DELIVERED`,
-  or `CANCELLED`).
+- Orders with validated status transitions (`PAID → PACKED → SHIPPED →
+  DELIVERED`, or `CANCELLED`; cancelling restocks the products).
 - Analytics: views, carts, orders, conversion, revenue, category mix, top
   products, buyer regions and a conversion funnel.
 
@@ -169,10 +192,10 @@ GET  /api/products?q=&category=&minPrice=&maxPrice=&minRating=&sort=&page=&size=
 GET  /api/products/featured
 GET  /api/products/{id}
 GET  /api/products/{id}/reviews
-GET  /api/meta/categories | /offers | /stats
+GET  /api/meta/categories | /offers | /stats | /config
 GET  /api/recommendations/product/{id}
 GET  /api/recommendations/me        (personalised when a JWT is present)
-POST /api/events                    (anonymous VIEW/CART signals)
+POST /api/cart/quote                (server-owned pricing, works for guests)
 ```
 
 Authenticated:
@@ -181,9 +204,16 @@ Authenticated:
 POST /api/auth/register | /login
 GET  /api/auth/me
 POST /api/products/{id}/reviews
-POST /api/orders
+POST /api/orders                    (Idempotency-Key header; one seller per order)
 GET  /api/orders/mine
+GET  /api/orders/{id}
+POST /api/events                    (VIEW/CART signals)
 ```
+
+`POST /api/orders` returns the existing order when the same `Idempotency-Key`
+is replayed, rejects mixed-seller baskets with 409, and takes totals only from
+the server-side pricing rules. `/api/meta/config` exposes the active currency,
+shipping threshold, fee and feature switches.
 
 Seller only (`ROLE_SELLER`): `/api/seller/overview`, `/analytics`, `/products`,
 `/products/{id}`, `/orders`, `/orders/{id}/status`, `/uploads`.
@@ -211,7 +241,9 @@ npm run dev            # http://localhost:5173
 
 Environment overrides accepted by the API: `SPRING_DATASOURCE_*`,
 `APP_JWT_SECRET`, `APP_JWT_TTL_DAYS`, `APP_CORS_ORIGINS`, `APP_UPLOADS_DIR`,
-`APP_SEED_ENABLED`.
+`APP_SEED_ENABLED`, `APP_DB_POOL_SIZE`, `APP_PRICING_FREE_SHIPPING_THRESHOLD`,
+`APP_PRICING_SHIPPING_FEE`, `APP_FEATURES_CHECKOUT_ENABLED`,
+`APP_FEATURES_EVENTS_ENABLED`, `APP_FEATURES_SELLER_SIGNUP_ENABLED`.
 
 ## Deploy to production (Vercel + Railway + Supabase + Cloudflare)
 
@@ -223,9 +255,9 @@ Production is split by hostname:
 | `api.proforma.dpdns.org` | `/api/**` JSON API | Railway |
 | — | PostgreSQL | Supabase |
 
-Cloudflare is DNS, TLS and WAF in front of those hostnames. The tunnel in
-`environment/local/cloudflared.example.yml` is only for exposing local dev servers; production does
-not use it.
+Cloudflare is DNS, TLS and WAF in front of those hostnames. The current pilot instead uses the
+token tunnel in `environment/home`; `environment/local/cloudflared.example.yml` remains a helper for
+exposing Vite and Spring dev servers.
 
 ### 1. Supabase (database)
 
@@ -303,7 +335,8 @@ Privacy policy URL for the store listing: `https://proforma.dpdns.org/privacy`.
 ## Operations notes
 
 - **Health** — nginx `GET /healthz`; API `GET /actuator/health` (network-only).
-- **Logs** — `docker logs`; Hibernate SQL logging is suppressed by default.
+- **Logs** — `docker logs`; Hibernate SQL logging is suppressed by default, and the home stack caps
+  each container at 3 × 10 MB.
 - **Uploads** — stored in the `uploads` volume and served by the API under
   `/media/...`, proxied and cached for 7 days by nginx.
 - **State** — Terraform state is local by design. Replace the `backend "local"`
@@ -312,3 +345,6 @@ Privacy policy URL for the store listing: `https://proforma.dpdns.org/privacy`.
   `postgres_password` and `jwt_secret` in `terraform.tfvars` for any real host.
 - **HTTP** — the gateway listens on plain HTTP. Terminate TLS in front of it
   (load balancer, Caddy, Cloudflare) for a public deployment.
+- **Backups** — the home stack provides `docker compose --profile tools run --rm backup` and
+  `backup-uploads`; see `environment/home/README.md` for restore steps and a Task Scheduler
+  example.
